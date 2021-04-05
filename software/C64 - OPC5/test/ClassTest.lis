@@ -1,0 +1,60 @@
+     1	using name mangler;
+     2	
+     3	class ClassTest
+     4	{
+     5	public:
+     6		int a;
+     7		int b;
+     8		int Add(int a, int b);
+     9	};
+    10	
+    11	int ClassTest()
+    12	{
+    13		ClassTest a, b;
+    14	
+    15		a.a = a.a + b.a;
+    16		return a.a;
+    17	}
+    18	
+
+
+*** local symbol table ***
+
+_a         =ffffffff   -    Auto        class _ClassTest 
+_b         =fffffffe   -    Auto        class _ClassTest 
+
+
+
+    19	int ClassTest::Add(int c, int d)
+    20	{
+    21		return a + b + c + d;
+    22	}
+
+
+*** local symbol table ***
+
+
+
+
+
+ *** global scope typedef symbol table ***
+
+_ClassTest =000001   -    Global      Function returning Short
+		Parameters:
+			Type array:
+   
+
+ *** structures and unions ***
+
+_ClassTest =000000   -    Type        class _ClassTest 
+    _typeno    =00002c   -    Member      Char
+    _a         =000001   -    Member      Short
+    _b         =000002   -    Member      Short
+    _Add       =000003   -    Member      Function returning Short
+		Parameters:
+			Type array:
+   016 016 
+    _Add       =000001   -    External    Function returning Short
+		Parameters:
+			Type array:
+   016 016 

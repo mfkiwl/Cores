@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2012-2015  Robert Finch, Stratford
+//   \\__/ o\    (C) 2012-2016  Robert Finch, Stratford
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -61,7 +61,8 @@ enum e_node {
 		en_c_ref, en_uc_ref, en_h_ref, en_uh_ref,
         en_b_ref, en_w_ref, en_ub_ref, en_uw_ref,
 		en_struct_ref,
-        en_fcall, en_tempref, en_regvar, en_bregvar, en_fpregvar, en_tempfpref,
+        en_fcall, en_ifcall,
+         en_tempref, en_regvar, en_bregvar, en_fpregvar, en_tempfpref,
 		en_add, en_sub, en_mul, en_mod,
 		en_ftadd, en_ftsub, en_ftmul, en_ftdiv,
 		en_fdadd, en_fdsub, en_fdmul, en_fddiv,
@@ -83,11 +84,13 @@ enum e_node {
 		en_chk
 		};
 
-struct enode {
+class ENODE {
+public:
     enum e_node nodetype;
 	enum e_bt etype;
 	long      esize;
     TYP *tp;
+    SYM *sym;
     __int8 constflag;
     unsigned int predreg : 4;
 	unsigned int isVolatile : 1;
@@ -100,18 +103,23 @@ struct enode {
 	__int8 bit_offset;
 	__int8 scale;
 	// The following could be in a value union
-    __int64 i;
-    double f;
-    double f1, f2;
-    char  *sp;
-    struct enode *p[3];
+  __int64 i;
+  double f;
+  double f1, f2;
+  std::string *sp;
+  std::string *msp;
+	std::string *udnm;			// undecorated name
+	void *ctor;
+	void *dtor;
+  ENODE *p[3];
+  void SetType(TYP *t) { tp = t; };
 };
 
-typedef struct enode ENODE;
+//typedef struct enode ENODE;
 
 typedef struct cse {
         struct cse      *next;
-        struct enode    *exp;           /* optimizable expression */
+        ENODE *exp;           /* optimizable expression */
         int             uses;           /* number of uses */
         int             duses;          /* number of dereferenced uses */
         short int       voidf;          /* cannot optimize flag */

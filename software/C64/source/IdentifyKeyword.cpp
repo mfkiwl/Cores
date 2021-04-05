@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2012-2014  Robert Finch, Stratford
+//   \\__/ o\    (C) 2012-2016  Robert Finch, Stratford
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -63,9 +63,12 @@ int IdentifyKeyword()
 				return lastst = kw_char;
 	}
 
-	if (p[0]=='d') {	// do,default,double,dcache
+	if (p[0]=='d') {	// do,default,double,dcache,delete
 		if (p[1]=='o' && p[2]=='\0')
 			return lastst = kw_do;
+		if (p[1]=='e' && p[2]=='l' && p[3]=='e' && p[4]=='t' && p[5]=='e' && p[6]=='\0') {
+			return lastst = kw_delete;
+		}
 		if (p[1]=='o' && p[2]=='u' && p[3]=='b' && p[4]=='l' && p[5]=='e' && p[6]=='\0')
 			return lastst = kw_double;
 		if (p[1]=='e' && p[2]=='f' && p[3]=='a' && p[4]=='u' && p[5]=='l' && p[6]=='t' && p[7]=='\0')
@@ -164,7 +167,9 @@ int IdentifyKeyword()
 		if (p[1]=='l' && p[2]=='i' && p[3]=='g' && p[4]=='n' && p[5]=='\0')
 			return lastst = kw_align;
 	}
-	if (p[0]=='v') {		// void,volatile
+	if (p[0]=='v') {		// virtual,void,volatile
+		if (p[1]=='i' && p[2]=='r' && p[3]=='t' && p[4]=='u' && p[5]=='a' && p[6]=='l' && p[7]=='\0')
+			return lastst = kw_virtual;
 		if (p[1]=='o' && p[2]=='i' && p[3]=='d' && p[4]=='\0')
 			return lastst = kw_void;
 		if (p[1]=='o' && p[2]=='l' && p[3]=='a' && p[4]=='t' && p[5]=='i' && p[6]=='l' && p[7]=='e' && p[8]=='\0')
@@ -178,14 +183,22 @@ int IdentifyKeyword()
 	}
 	if (p[0]=='l' && p[1]=='o' && p[2]=='o' && p[3]=='p' && p[4]=='\0')
 		return lastst = kw_loop;
-	if (p[0]=='u') {	// unsigned,union,until
+
+	if (p[0]=='u') {	// unsigned,union,until,unique,using
 		if (p[1]=='n' && p[2]=='s' && p[3]=='i' && p[4]=='g' && p[5]=='n' && p[6]=='e' && p[7]=='d' && p[8]=='\0')
 			return lastst = kw_unsigned;
 		if (p[1]=='n' && p[2]=='i' && p[3]=='o' && p[4]=='n' && p[5]=='\0')
 			return lastst = kw_union;
 		if (p[1]=='n' && p[2]=='t' && p[3]=='i' && p[4]=='l' && p[5]=='\0')
 			return lastst = kw_until;
+  	if (p[1]=='n' && p[2]=='i' && p[3]=='q' && p[4]=='u' && p[5]=='e' && p[6]=='\0') {
+  		return lastst = kw_unique;
+  	}
+  	if (p[1]=='s' && p[2]=='i' && p[3]=='n' && p[4]=='g' && p[5]=='\0') {
+  		return lastst = kw_using;
+  	}
 	}
+
 	if (p[0]=='f') {	// float,forever,for,fallthru,firstcall,false
 		if (p[1]=='o' && p[2]=='r' && p[3]=='\0')
 			return lastst = kw_for;
@@ -216,7 +229,13 @@ int IdentifyKeyword()
 		if (p[1]=='r' && p[2]=='o' && p[3]=='l' && p[4]=='o' && p[5]=='g' && p[6]=='\0')
 			return lastst = kw_prolog;
 	}
-	if (p[0]=='n') {	// nocall,null,naked
+	if (p[0]=='n') {	// nocall,null,naked,new,namespace,not
+		if (p[1]=='e' && p[2]=='w' && p[3]=='\0') {
+			return lastst = kw_new;
+		}
+		if (p[1]=='o' && p[2]=='t' && p[3]=='\0') {
+			return lastst = kw_not;
+		}
 		if (p[1]=='a' && p[2]=='k' && p[3]=='e' && p[4]=='d' && p[5]=='\0')
 			return lastst = kw_naked;
 		if (p[1]=='o' && p[2]=='c' && p[3]=='a' && p[4]=='l' && p[5]=='l' && p[6]=='\0')
@@ -225,6 +244,8 @@ int IdentifyKeyword()
 			ival = 0;
 			return lastst = iconst;
 		}
+		if (p[1]=='a' && p[2]=='m' && p[3]=='e' && p[4]=='s' && p[5]=='p' && p[6]=='a' && p[7]=='c' && p[8]=='e' && p[9]=='\0')
+			return lastst = kw_namespace;
 	}
 	// kernel
 	if (p[0]=='k') {
@@ -237,19 +258,19 @@ int IdentifyKeyword()
 	if (p[0]=='s' && p[1]=='p' && p[2]=='i' && p[3]=='n' && p[4]=='u' && p[5]=='n' && p[6]=='l' && p[7]=='o' && p[8]=='c' && p[9]=='k' && p[10]=='\0')
 		return lastst = kw_spinunlock;
 
-	// triple true
-	if (p[0]=='t' && p[1]=='r' && p[2]=='u' && p[3]=='e' && p[4]=='\0') {
-		ival = 1;
-		return lastst = iconst;
-	}
-	if (p[0]=='t' && p[1]=='r' && p[2]=='i' && p[3]=='p' && p[4]=='l' && p[5]=='e' && p[6]=='\0') {
-		return lastst = kw_triple;
-	}
-
-	// unique
-	if (p[0]=='u' && p[1]=='n' && p[2]=='i' && p[3]=='q' && p[4]=='u' && p[5]=='e' && p[6]=='\0') {
-		return lastst = kw_unique;
-	}
+	// this,triple,true
+	if (p[0]=='t') {
+  	if (p[1]=='r' && p[2]=='u' && p[3]=='e' && p[4]=='\0') {
+  		ival = 1;
+  		return lastst = iconst;
+  	}
+  	if (p[1]=='h' && p[2]=='i' && p[3]=='s' && p[4]=='\0') {
+  		return lastst = kw_this;
+  	}
+  	if (p[1]=='r' && p[2]=='i' && p[3]=='p' && p[4]=='l' && p[5]=='e' && p[6]=='\0') {
+  		return lastst = kw_triple;
+  	}
+  }
 
 
 	// __cdecl,__asm,__int64,__int32,__int16,__int8,__check,__exception,__task,__unordered,__leafs

@@ -30,6 +30,7 @@ module Thor_alu(corenum, rst, clk, alu_ld, alu_abort, alu_op, alu_fn, alu_argA, 
 parameter DBW=64;
 parameter BIG=1;
 parameter FEATURES = 0;
+parameter SEGMODEL = 2;
 input [63:0] corenum;
 input rst;
 input clk;
@@ -208,7 +209,7 @@ case(alu_op)
 	`MUL,`MULU:     o <= BIG ? alu_prod[63:0] : 64'hDEADDEADDEADDEAD;
 	`DIV,`DIVU:     o <= BIG ? alu_divq : 64'hDEADDEADDEADDEAD;  
     `MOD,`MODU:     o <= BIG ? alu_rem : 64'hDEADDEADDEADDEAD;
-    `CHK:           o <= ($signed(alu_argC) >= $signed(alu_argA)) && ($signed(alu_argC) < $signed(alu_argB));
+    `CHK,`CHKX:     o <= ($signed(alu_argC) >= $signed(alu_argA)) && ($signed(alu_argC) < $signed(alu_argB));
 	default:   o <= 64'hDEADDEADDEADDEAD;
 	endcase
 `MULI,`MULUI:   o <= BIG ? alu_prod[63:0] : 64'hDEADDEADDEADDEAD;
@@ -395,26 +396,68 @@ case(alu_op)
 `LB,`LBU,`LC,`LCU,`LH,`LHU,`LW,`SB,`SC,`SH,`SW,`CAS,`LVB,`LVC,`LVH,`LVW,`STI,
 `LWS,`SWS,`STS,`STFND,`STCMP,`PUSH:
             begin
-				o <= alu_argA + alu_argC + alu_argI;
+              if (SEGMODEL==2)
+				        o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + alu_argI[DBW-4:0]};
+				     else
+				        o <= alu_argA + alu_argC + alu_argI;
 		    end
-`JMPI:      o <= {alu_argA << alu_fn[1:0]} + alu_argC + alu_argI;
+`JMPI:      if (SEGMODEL==2)
+              o <= {alu_argA[DBW-1:DBW-3],{alu_argA[DBW-6:0] << alu_fn[1:0]} + alu_argI[DBW-4:0]};
+            else
+              o <= {alu_argA << alu_fn[1:0]} + alu_argC + alu_argI;
 `LBX,`LBUX,`SBX,
 `LCX,`LCUX,`SCX,
 `LHX,`LHUX,`SHX,
 `LWX,`SWX,`LLAX,
 `JMPIX:	
-            case(alu_fn[1:0])
-            2'd0:   o <= alu_argA + alu_argC + alu_argB;
-            2'd1:   o <= alu_argA + alu_argC + {alu_argB,1'b0};
-            2'd2:   o <= alu_argA + alu_argC + {alu_argB,2'b0};
-            2'd3:   o <= alu_argA + alu_argC + {alu_argB,3'b0};
-            endcase
-`ifdef STACKOPS
-`PEA,`LINK: o <= alu_argA + alu_argC - 64'd8;
-`UNLINK:    o <= alu_argA + alu_argC + 64'd8;
-`POP:       o <= alu_argA + alu_argC;
+            if (SEGMODEL==2) begin
+              case(alu_fn[1:0])
+              2'd0:   o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + alu_argB[DBW-4:0]};
+              2'd1:   o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + {alu_argB[DBW-5:0],1'b0}};
+              2'd2:   o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + {alu_argB[DBW-6:0],2'b0}};
+              2'd3:   o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + {alu_argB[DBW-7:0],3'b0}};
+              endcase
+            end
+            else begin
+              case(alu_fn[1:0])
+              2'd0:   o <= alu_argA + alu_argC + alu_argB;
+              2'd1:   o <= alu_argA + alu_argC + {alu_argB,1'b0};
+              2'd2:   o <= alu_argA + alu_argC + {alu_argB,2'b0};
+              2'd3:   o <= alu_argA + alu_argC + {alu_argB,3'b0};
+              endcase
+            end
+`ifdef VECTOROPS
+`LV,`SV:      if (SEGMODEL==2)
+                o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + alu_argI[DBW-4:0]}; 
+              else
+                o <= alu_argA + alu_argC + alu_argI;         
+`LVWS,`SVWS:  if (SEGMODEL==2)
+                o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + alu_argB[DBW-10:0] * alu_argI[8:3]}; 
+              else 
+                o <= alu_argA + alu_argC + alu_argB * alu_argI[8:3];
+`LVX,`SVX:    if (SEGMODEL=2)
+                o <= {alu_argA[DBW-1:DBW-3],alu_argA[DBW-4:0] + alu_argB[DBW-4:0]}; 
+              else
+                o <= alu_argA + alu_argC + alu_argB;
 `endif
-`JSR,`JSRS,`JSRZ,`SYS:	o <= alu_pc + insnsz;
+`ifdef STACKOPS
+`PEA,`LINK: 
+            if (SEGMODEL==2)
+              o <= alu_argA - 64'd8;
+            else
+              o <= alu_argA + alu_argC - 64'd8;
+`UNLINK:    if (SEGMODEL==2)
+              o <= alu_argA + 64'd8;
+            else 
+              o <= alu_argA + alu_argC + 64'd8;
+`POP:       if (SEGMODEL==2)
+              o <= alu_argA;
+            else
+              o <= alu_argA + alu_argC;
+`endif
+// should really account for a prefix as well
+// insn size += size of prefix
+`JSR,`JSRS,`JSRZ,`SYS,`JSF:	o <= alu_pc + insnsz;
 `INT:		o <= alu_pc;
 `MFSPR,`MTSPR:	begin
                 o <= alu_argA;
@@ -438,7 +481,15 @@ case(alu_op)
 `BITFIELD:	o <= BIG ? bf_out : 64'hDEADDEADDEADDEAD;
 `endif
 `LOOP:      o <= alu_argA > 0 ? alu_argA - 64'd1 : alu_argA;
-`CHKI:      o <= ($signed(alu_argB) >= $signed(alu_argA)) && ($signed(alu_argB) < $signed(alu_argI));
+`CHKXI:   o <= ($signed(alu_argB) >= $signed(alu_argA)) && ($signed(alu_argB) < $signed(alu_argI));
+`CHKI:
+    begin
+        o1[0] = ($signed(alu_argB) >= $signed(alu_argA)) && ($signed(alu_argB) < $signed(alu_argI));
+        o1[1] = 1'b0;
+        o1[2] = 1'b0;
+        o1[3] = 1'b0;
+        o <= {16{o1}};
+    end
 default:	o <= 64'hDEADDEADDEADDEAD;
 endcase
 end

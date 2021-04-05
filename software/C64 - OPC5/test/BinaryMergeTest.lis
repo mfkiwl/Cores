@@ -1,0 +1,22 @@
+     1	
+     2	int BinaryMergeTest(register int a, register int b)
+     3	{
+     4		return a + b + 1;
+     5	}
+
+
+*** local symbol table ***
+
+
+
+
+
+ *** global scope typedef symbol table ***
+
+_BinaryMergeTest =000000   -    External    Function returning Short
+		Parameters:
+			Type array:
+   016 016 
+
+ *** structures and unions ***
+

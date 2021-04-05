@@ -7,23 +7,16 @@
 #include <time.h>
 #include <dos.h>
 #include <ht.h>
+#include <direct.h>
 
 #define ALLOC
 #include "fpp.h"
 
 /* ---------------------------------------------------------------------------
-   
-   (C) 1992 FinchWare
+   (C) 1992,2014 Robert T Finch
 
    fpp - PreProcessor for Assembler / Compiler
    This file contains processing for main and most of the directives.
-
-   Changes
-           Author      : R. Finch
-           Date        : /90
-           Release     :
-           Description : new module
-
 --------------------------------------------------------------------------- */
 
 void ShellSort(void *, int, int, int (*)());   // Does a shellsort - like bsort()
@@ -139,7 +132,9 @@ void ddefine()
    dp.body = ptr;
    p = (SDef *)htFind(&HashInfo, &dp);
    if (p) {
-      err((strcmp(p->body, dp.body) ? 6 : 23), dp.name);
+		 if (strcmp(p->body, dp.body))
+			 err(6, dp.name);
+      //err((strcmp(p->body, dp.body) ? 6 : 23), dp.name);
       free(dp.name);
       return;
    }
@@ -183,8 +178,10 @@ void dinclude()
 {
    char *tname;
    char *f;
-   char path[150];
-   char name[150];
+   char path[250];
+   char name[250];
+   char wpath[250];
+	 char buf[260];
    int ch;
    SDef *p;
 
@@ -207,6 +204,26 @@ void dinclude()
       } while(1);
       *f = 0;
       strcpy(path, name);
+      if (_access(path, 0) < 0) {
+		  _getcwd(wpath, sizeof(wpath) - 1);
+           strcpy(path, SourceName);
+           f = strrchr(path,'\\');
+           if (!f)
+               f = strrchr(path, '/');
+           if (f) {
+               strcpy(f+1,name);
+           }
+				// Can't find the file in the given path, try the include paths.
+		   if (!f || _access(path, 0) < 0) {
+				 searchenv((char *)name, (char *)"FPPINC", (char *)path, sizeof(path));
+				 if (path[0] == '\0')
+					 searchenv((char *)name, (char *)"INCLUDE", (char *)path, sizeof(path));
+				 if (path[0] == '\0') {
+					 err(9, name);
+					 return;
+				 }
+		   }
+      }
    }
    else if (ch == '<')
    {
@@ -220,25 +237,28 @@ void dinclude()
          f++;
       } while(1);
       *f = 0;
-      searchenv((char *)name, (char *)"INCLUDE", (char *)path);
+      searchenv((char *)name, (char *)"FPPINC", (char *)path, sizeof(path));
+	  if (path[0]=='\0')
+		searchenv((char *)name, (char *)"INCLUDE", (char *)path, sizeof(path));
    }
    if (ch != '\n')
 	   ScanPastEOL();
 
    if (path[0])
    {
-      bbfile.body = StorePlainStr(path);
-      p = (SDef *)htFind(&HashInfo, &bbfile);
-      if (p)
-         p->body = bbfile.body;
-      ProcFile(bbfile.body);
-      bbfile.body = tname;
-      p = (SDef *)htFind(&HashInfo, &bbfile);
-      if (p)
-         p->body = bbfile.body;
+		 sprintf_s(buf, sizeof(buf), "%c%s%c", 0x22, path, 0x22);
+    bbfile.body = StorePlainStr(buf);
+    p = (SDef *)htFind(&HashInfo, &bbfile);
+    if (p)
+        p->body = bbfile.body;
+    ProcFile(bbfile.body);
+    bbfile.body = tname;
+    p = (SDef *)htFind(&HashInfo, &bbfile);
+    if (p)
+        p->body = bbfile.body;
    }
    else
-      err(9, path);
+      err(9, name);
 }
 
 /* -----------------------------------------------------------------------------
@@ -277,7 +297,8 @@ void dline()
    {
       inptr = ptr;
       memset(name, 0, sizeof(name));
-      strncpy(name, ptr+1, strcspn(ptr+1, " \t\n\r\x22"));
+      strncpy(name, ptr, strcspn(ptr+1, " \t\n\r\x22"));
+			strcat(name, "\"");
       bbfile.body = StorePlainStr(name);
       p = (SDef *)htFind(&HashInfo, &bbfile);
       if (p)
@@ -380,7 +401,7 @@ void ProcLine()
 	  // write out the current input buffer
 	  if (fdbg) fprintf(fdbg, "aft paste:%s", inbuf);
       if (fputs(inbuf,ofp)==EOF)
-		  printf("fputs failed.\r\n");
+		  printf("fputs failed.\n");
    }
    InLineNo++;          // Update line number (including __LINE__).
    sprintf(bbline.body, "%5d", InLineNo);
@@ -397,9 +418,18 @@ void ProcLine()
 void ProcFile(char *fname)
 {
    FILE *fp;
+	 char buf[260];
 
-   if((fp = fopen(fname,"r")) == NULL) {
-      err(9, fname);
+	 // Strip leading/trailing quotes from filename.
+	 if (fname[0] == '"')
+		 strcpy_s(buf, sizeof(buf), fname + 1);
+	 else
+		 strcpy_s(buf, sizeof(buf), fname);
+	 if (buf[strlen(buf) - 1] == '"')
+		 buf[strlen(buf) - 1] = '\0';
+
+	 if((fp = fopen(buf,"r")) == NULL) {
+      err(9, buf);
       return;
    }
 
@@ -570,12 +600,14 @@ void SetStandardDefines(void)
 {
    time_t ltm;
    struct tm *LocalTime;
+	 char buf[260];
 
    time(&ltm);
    LocalTime = localtime(&ltm);
    bbstdc.body = StoreStr("1");
    bbline.body = StoreStr("%5d", 1);
-   bbfile.body = StoreStr(SourceName);
+	 sprintf_s(buf, sizeof(buf), "%c%s%c", 0x22, SourceName, 0x22);
+   bbfile.body = StoreStr(buf);
    bbdate.body = StoreStr("%02d/%02d/%02d", LocalTime->tm_year, LocalTime->tm_mon+1, LocalTime->tm_mday);
    bbtime.body = StoreStr("%02d:%02d:%02d", LocalTime->tm_hour, LocalTime->tm_min, LocalTime->tm_sec);
    bbpp.body = StoreStr("fpp");
@@ -597,12 +629,13 @@ main(int argc, char *argv[]) {
    int
       xx;
    SDef *p;
+	 char buf[260];
    
    HashInfo.size = MAXMACROS;
    HashInfo.width = sizeof(SDef);
    if (argc < 2)
    {
-		fprintf(stderr, "FPP version 1.19  (C) 1998,2011-2014 Robert T Finch  \n");
+		fprintf(stderr, "FPP version 1.25  (C) 1998-2018 Robert T Finch  \n");
 		fprintf(stderr, "\nfpp [options] <filename> [<output filename>]\n\n");
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "/D<macro name>[=<definition>] - define a macro\n");
@@ -628,7 +661,7 @@ main(int argc, char *argv[]) {
       parsesw(argv[xx]);
 
 	if (banner)
-		fprintf(stderr, "FPP version 1.19  (C) 1998,2011-2014 Robert T Finch  \n");
+		fprintf(stderr, "FPP version 1.25  (C) 1998-2018 Robert T Finch  \n");
 
    /* ---------------------------
          Get source file name.
@@ -645,13 +678,13 @@ main(int argc, char *argv[]) {
           Check for extension and add one if neccessary.
    ----------------------------------------------------- */
    if (!strchr(SourceName, '.'))
-      strcat(SourceName, ".c");
+      strcat_s(SourceName, sizeof(SourceName)-1, ".c");
 
    OutputName[0] = '\0';
    if (xx < argc) {
       strncpy(OutputName, argv[xx], sizeof(OutputName));
       if (!strchr(OutputName, '.'))
-         strcat(OutputName, ".pp");
+         strcat_s(OutputName, sizeof(OutputName)-1,".pp");
    }
 
    /* ------------------------------
@@ -675,7 +708,8 @@ main(int argc, char *argv[]) {
    else
       ofp = stdout;
    errors = warnings = 0;
-   bbfile.body = StorePlainStr(SourceName);
+	 sprintf_s(buf, sizeof(buf), "%c%s%c", 0x22, SourceName, 0x22);
+	 bbfile.body = StorePlainStr(buf);
    p = (SDef *)htFind(&HashInfo, &bbfile);
    if (p)
       p->body = bbfile.body;

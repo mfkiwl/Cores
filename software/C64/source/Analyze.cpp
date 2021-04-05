@@ -99,10 +99,10 @@ int equalnode(ENODE *node1, ENODE *node2)
 			return (node1->i == node2->i);
 	   }
       case en_nacon:{
-			return (!strcmp(node1->sp, node2->sp));
+			return (node1->sp->compare(*node2->sp)==0);
 	    }
 	  case en_cnacon:
-			return (!strcmp(node1->sp, node2->sp));
+			return (node1->sp->compare(*node2->sp)==0);
       default:
 	        if( IsLValue(node1) && equalnode(node1->p[0], node2->p[0])  )
 		        return TRUE;
@@ -232,6 +232,8 @@ static void scanexpr(ENODE *node, int duse)
         return;
 
 	switch( node->nodetype ) {
+	  case en_regvar:
+	    break;
 		case en_cnacon:
 		case en_clabcon:
 		case en_fcon:
@@ -376,7 +378,7 @@ static void scanexpr(ENODE *node, int duse)
                 scanexpr(node->p[0],1);
                 scanexpr(node->p[1],0);
                 break;
-        default: printf("Uncoded node in scanexpr():%d\r\n", node->nodetype);
+        default: dfs.printf("Uncoded node in scanexpr():%d\r\n", node->nodetype);
         }
 }
 
@@ -452,13 +454,13 @@ static void scan_compound(Statement *stmt)
 {
 	SYM *sp;
 
-	sp = stmt->ssyms.head;
+	sp = sp->GetPtr(stmt->ssyms.GetHead());
 	while (sp) {
 		if (sp->initexp) {
 			opt_const(&sp->initexp);
             scanexpr(sp->initexp,0);
 		}
-		sp = sp->next;
+		sp = sp->GetNextPtr();
 	}
     scan(stmt->s1);
 }
@@ -650,8 +652,10 @@ void repexpr(ENODE *node)
                         repexpr(node->p[0]);
                         repexpr(node->p[1]);
                         break;
+                case en_regvar:
+                  break;
                 default:
-                        printf("Uncoded node in repexr():%d\r\n",node->nodetype);
+                        dfs.printf("Uncoded node in repexr():%d\r\n",node->nodetype);
                 }
 }
 
@@ -717,12 +721,12 @@ static void repcse_compound(Statement *stmt)
 {
 	SYM *sp;
 
-	sp = stmt->ssyms.head;
+	sp = sp->GetPtr(stmt->ssyms.GetHead());
 	while (sp) {
 		if (sp->initexp) {
 			repexpr(sp->initexp);
 		}
-		sp = sp->next;
+		sp = sp->GetNextPtr();
 	}
 	repcse(stmt->s1);
 }

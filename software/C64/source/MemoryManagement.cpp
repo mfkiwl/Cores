@@ -24,6 +24,8 @@
 // ============================================================================
 //
 #include "stdafx.h"
+#include <stdlib.h>
+#include <malloc.h>
 
 /*
  *	68000 C compiler
@@ -50,6 +52,36 @@ struct blk {
     struct blk *next;
     char       m[1];           /* memory area */
 };
+
+MBlk *MBlk::first = 0;
+
+void *allocx(int sz)
+{
+	return MBlk::alloc(sz);
+}
+
+void *MBlk::alloc(int sz)
+{
+//  dfs.printf("Enter MBlk::alloc()\n");
+	MBlk *p = (MBlk *)new char[sz+sizeof(MBlk)+15];
+	if (p==0)
+	   return p;
+	ZeroMemory((void *)p,sz+sizeof(MBlk));
+	p->next = first;
+	first = p;
+//  dfs.printf("Leave MBlk::alloc()\n");
+	return &p[1];
+}
+
+void MBlk::ReleaseAll()
+{
+	MBlk *mbk;
+	while (first) {
+		mbk = first->next;
+		delete[] first;
+		first = mbk;
+	}
+}
 
 static int      glbsize = 0,    /* size left in current global block */
                 locsize = 0,    /* size left in current local block */
@@ -128,8 +160,6 @@ void ReleaseLocalMemory()
     }
     locblk = (struct blk *)NULL;
     locsize = 0;
-    lsyms.head = (SYM *)NULL;
-	lsyms.tail = (SYM *)NULL;
 	currentStmt = (Statement *)NULL;
 	if (verbose) printf(" releasing %d bytes local tables.\n",blkcnt * BLKSIZE);
 }
@@ -137,34 +167,71 @@ void ReleaseLocalMemory()
 void ReleaseGlobalMemory()
 {
 	struct blk      *bp1, *bp2;
-    int             blkcnt;
-    bp1 = glbblk;
-    blkcnt = 0;
-    while( bp1 != (struct blk *)NULL ) {
+  int             blkcnt;
+
+  dfs.printf("Enter ReleaseGlobalMemory\n");
+  bp1 = glbblk;
+  blkcnt = 0;
+  while( bp1 != (struct blk *)NULL ) {
 		if (strcmp(bp1->name,"C64    "))
-			printf("Block corrupted.");
-        bp2 = bp1->next;
-        free(bp1);
-        ++blkcnt;
-        bp1 = bp2;
-    }
-    glbblk = (struct blk *)NULL;
-    glbsize = 0;
+		  dfs.printf("Block corrupted.");
+    bp2 = bp1->next;
+    free(bp1);
+    ++blkcnt;
+    bp1 = bp2;
+  }
+  glbblk = (struct blk *)NULL;
+  glbsize = 0;
 //    gsyms.head = NULL;         /* clear global symbol table */
 //	gsyms.tail = NULL;
 	memset(gsyms,0,sizeof(gsyms));
 	if (verbose) printf(" releasing %d bytes global tables.\n",blkcnt * BLKSIZE);
     strtab = (struct slit *)NULL;             /* clear literal table */
+ dfs.printf("Leave ReleaseGlobalMemory\n");
 }
 
 SYM *allocSYM() {
-	SYM *sym = (SYM *)xalloc(sizeof(SYM));
-	memset(sym,'\0',sizeof(SYM));
+	SYM *sym = &compiler.symbolTable[compiler.symnum];
+	ZeroMemory(sym,sizeof(SYM));
+	sym->id = compiler.symnum;
+	sym->name = new std::string("");
+	sym->name2 = new std::string("");
+	sym->name3 = new std::string("");
+	sym->shortname = new std::string("");
+	sym->params.SetOwner(compiler.symnum);
+	sym->lsyms.SetOwner(compiler.symnum);
+	sym->proto.SetOwner(compiler.symnum);
+  compiler.symnum++;
+	if (compiler.symnum > 32760) {
+	  dfs.printf("Too many symbols.\n");
+    throw new C64PException(ERR_TOOMANY_SYMBOLS,1);
+  }
 	return sym;
 };
-TYP *allocTYP() { return (TYP *)xalloc(sizeof(TYP)); };
+
+TYP *allocTYP()
+{
+//  printf("allocTYP()\r\n");
+	TYP *tp = (TYP *)&compiler.typeTable[compiler.typenum];
+	ZeroMemory(tp,sizeof(TYP));
+	tp->sname = new std::string("");
+  tp->bit_width = -1;
+//	printf("Leave allocTYP():%p\r\n",tp);
+  compiler.typenum++;
+	if (compiler.typenum > 32760) {
+	  dfs.printf("Too many types\n");
+    throw new C64PException(ERR_TOOMANY_SYMBOLS,1);
+  }
+	return tp;
+};
+
 struct snode *allocSnode() { return (struct snode *)xalloc(sizeof(struct snode)); };
-ENODE *allocEnode() { return (ENODE *)xalloc(sizeof(ENODE)); };
+ENODE *allocEnode() {
+  ENODE *p;
+  p = (ENODE *)allocx(sizeof(ENODE));
+  p->sp = new std::string();
+  return p;
+};
 AMODE *allocAmode() { return (AMODE *)xalloc(sizeof(AMODE)); };
 CSE *allocCSE() { return (CSE *)xalloc(sizeof(CSE)); };
 

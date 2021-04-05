@@ -1,0 +1,70 @@
+     1	int abs(register int a)
+     2	{
+     3		return a < 0 ? -a : a;
+     4	}
+     5	
+
+
+*** local symbol table ***
+
+
+
+
+     6	int min(register int a, register int b)
+     7	{
+     8		return a < b ? a : b;
+     9	}
+    10	
+
+
+*** local symbol table ***
+
+
+
+
+    11	int max(register int a, register int b)
+    12	{
+    13		return a > b ? a : b;
+    14	}
+    15	
+
+
+*** local symbol table ***
+
+
+
+
+    16	unsigned int minu(register unsigned int a, register unsigned int b)
+    17	{
+    18		return a < b ? a : b;
+    19	}
+    20	
+
+
+*** local symbol table ***
+
+
+
+
+
+ *** global scope typedef symbol table ***
+
+_minu      =000000   -    External    Function returning 
+		Parameters:
+			Type array:
+   024 024 
+_abs       =000000   -    External    Function returning Short
+		Parameters:
+			Type array:
+   016 
+_min       =000000   -    External    Function returning Short
+		Parameters:
+			Type array:
+   016 016 
+_max       =000000   -    External    Function returning Short
+		Parameters:
+			Type array:
+   016 016 
+
+ *** structures and unions ***
+

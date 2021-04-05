@@ -1,0 +1,458 @@
+                        	;============================================================================
+                        	;        __
+                        	;   \\__/ o\    (C) 2016  Robert Finch, Stratford
+                        	;    \  __ /    All rights reserved.
+                        	;     \/_//     robfinch<remove>@finitron.ca
+                        	;       ||
+                        	;  
+                        	;
+                        	; This source file is free software: you can redistribute it and/or modify 
+                        	; it under the terms of the GNU Lesser General Public License as published 
+                        	; by the Free Software Foundation, either version 3 of the License, or     
+                        	; (at your option) any later version.                                      
+                        	;                                                                          
+                        	; This source file is distributed in the hope that it will be useful,      
+                        	; but WITHOUT ANY WARRANTY; without even the implied warranty of           
+                        	; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the            
+                        	; GNU General Public License for more details.                             
+                        	;                                                                          
+                        	; You should have received a copy of the GNU General Public License        
+                        	; along with this program.  If not, see <http://www.gnu.org/licenses/>.    
+                        	;                                                                          
+                        	; bootromV.asm
+                        	; - This is a first test program to see if the system works.
+                        	; - Each node will send a request to display the node number on
+                        	;   successive lines of the screen.
+                        	;============================================================================
+                        	;
+                        	TXTROWS		EQU		1
+                        	TXTCOLS		EQU		4
+                        	TEXTSCR		EQU		$FFD00000
+                        	SSG            EQU       $FFDC0080
+                        	SPRITE_CTRL    EQU       $FFDAD000
+                        	SPRITE_POS     EQU       $FFDAD000
+                        	SPRITE_IMAGE   EQU       $FFD80000
+                        	NOCC_PKTLO     EQU       $FFD80000
+                        	NOCC_PKTMID    EQU       $FFD80004
+                        	NOCC_PKTHI     EQU       $FFD80008
+                        	NOCC_TXPULSE   EQU       $FFD80018
+                        	NOCC_STAT      EQU       $FFD8001C
+                        	CPU_INFO       EQU       $FFD90000
+                        	GFX_CONTROL    EQU       $FFD40000
+                        	GFX_TGT_BASE   EQU       $FFD40010
+                        	GFX_TGT_SIZEX  EQU       $FFD40014
+                        	GFX_TGT_SIZEY  EQU       $FFD40018
+                        	GFX_CLIP_P0_X  EQU       $FFD40074
+                        	GFX_CLIP_P0_Y  EQU       $FFD40078
+                        	GFX_CLIP_P1_X  EQU       $FFD4007C
+                        	GFX_CLIP_P1_Y  EQU       $FFD40080
+                        	
+                        	BMP_PX          EQU    $FFDC5024
+                        	BMP_PY          EQU    $FFDC5028
+                        	BMP_COLOR       EQU    $FFDC502C
+                        	BMP_PCMD        EQU    $FFDC5030
+                        	
+                        	
+                        	  code
+                        		org		0x01FC
+0001FC 3B40006F		jmp		nmi_rout
+000200 0040006F		jmp		start
+                        	start:
+000204 FFC0673F	  ldi   sp,#$1BFFC       ; top of the 48k ram
+000208 0001B013
+00020C 8880693F	  ldi   a0,#$88888888
+000210 88888013
+000214 19C000EF	  jal   ra,srand
+                        	  ;lw    t0,CPU_INFO      ; figure out which core we are
+000218 F1001D73	  csrrw	t0,#$F10,x0
+00021C 00FD7D13	  andi  t0,t0,#15
+000220 002D2D13	  slti  t0,t0,#2
+000224 0A0D0A63	  beq   t0,x0,.0002      ; not core #1 (wasn't less than 2)
+000228 00002D3F	  lw    t0,NOCC_STAT     ; get which node we are
+00022C FFD80003
+000230 010D5D13	  srli  t0,t0,#16        ; extract bit field
+000234 00FD7D13	  andi  t0,t0,#15
+000238 000D6A33	  or    a2,t0,x0         ; move to a2
+00023C 01F0693F	  ldi   a0,#$1000001F    ; select write cycle to main system
+000240 10000013
+000244 600069BF	  ldi   a1,#$FFDC0600    ; LEDs
+000248 FFDC0013
+00024C 120000EF	  jal   ra,xmitPacket
+                        	  
+000250 15006D93	  ldi   t1,#336          ; number of bytes per screen line
+000254 03BD0D33	  mul   t0,t0,t1         ; r4 = node number * bytes per screen line
+000258 000D09BF	  addi  a1,t0,#$FFD00000 ; add in screen base address r2 = address
+00025C FFD00013
+000260 01F0693F	  ldi   a0,#$1000001F    ; target system interface for word write cycle
+000264 10000013
+000268 830A6A3F	  ori   a2,a2,#%000111000_110110110_000011_0000    ; grey on green text
+00026C 01C6D013
+000270 0FC000EF	  jal   ra,xmitPacket
+                        	
+                        	  ; If we are cpu#1 of node#1 - initialize graphics controller
+                        	;  lw    t0,CPU_INFO      ; figure out which core we are
+000274 F1001D73	  csrrw	t0,#$F10,x0
+                        	  ; assign node 6 to daring diagonal line test
+000278 06106D93	  ldi   t1,#$61
+00027C 07BD0063	  beq   t0,t1,bmp_line
+000280 05106D93	  ldi   t1,#$51
+                        	;  jal   x0,bmp_rand
+                        	;  beq   x0,x0,bmp_rand
+000284 02106D93	  ldi   t1,#$21
+000288 01BD1263	  bne   t0,t1,.0004
+                        	;  jal   ra,init_gfx
+                        	
+                        	.0004
+                        	  ; Wait a random length of time (1 to 8 loops)
+00028C 3E806A93	  ldi   a3,#1000         ; run 1000 times
+                        	.0001:
+000290 138000EF	  jal   ra,gen_rand      ; generate random number (0-7)
+000294 00787813	  andi  v0,v0,#7
+000298 00180813	  addi  v0,v0,#1
+                        	.0003:
+00029C FFF80813	  addi  v0,v0,#-1
+0002A0 FE081EE3	  bne   v0,x0,.0003
+                        	  ; Write a random character on the screen
+0002A4 01F0693F	  ldi   a0,#$1000001F    ; select write cycle to main system
+0002A8 10000013
+0002AC 11C000EF	  jal   ra,gen_rand      ; compute a random screen address
+0002B0 000869B3	  or    a1,v0,x0
+0002B4 FFC9F9BF	  andi  a1,a1,#$3FFC
+0002B8 00003013
+0002BC 0009E9BF	  ori   a1,a1,#$FFD00000 ; or in text screen memory address
+0002C0 FFD00013
+0002C4 104000EF	  jal   ra,gen_rand      ; get random color and character data
+0002C8 00086A33	  or    a2,v0,x0
+0002CC 0A0000EF	  jal   ra,xmitPacket    ; transmit to system controller
+0002D0 FFFA8A93	  addi  a3,a3,#-1        ; decrement loop count
+0002D4 FA000EE3	  beq   x0,x0,.0001      ; keep repeating forever anyway for now
+                        	;  jal   ra,sprite_demo
+                        	  ; Here do processing for the second CPU
+                        	.0002:
+0002D8 00000063	  beq   x0,x0,.0002
+                        	
+                        	//---------------------------------------------------------------------------
+                        	// Draw a diagonal line to test bitmap controller
+                        	//---------------------------------------------------------------------------
+                        	bmp_line:
+                        	.su5:
+0002DC 00006D93	    ldi   t1,#0
+0002E0 EA406EBF	    ldi   t3,#0xEA4        ; 12 bit orange
+0002E4 00000013
+0002E8 00206F13	    ldi   t4,#2            ; 2 = plot pixel
+0002EC 01F0693F	    ldi   a0,#$1000001F    ; target system interface for word write cycle
+0002F0 10000013
+0002F4 02C069BF	    ldi   a1,#BMP_COLOR    ; address of color control register
+0002F8 FFDC5013
+0002FC 000EEA33	    or    a2,t3,x0         ; move color to arg reg
+000300 06C000EF	    jal   ra,xmitPacket
+                        	.su4:
+000304 024069BF	    ldi   a1,#BMP_PX
+000308 FFDC5013
+00030C 000DEA33	    or    a2,t1,x0
+000310 05C000EF	    jal   ra,xmitPacket
+000314 028069BF	    ldi   a1,#BMP_PY
+000318 FFDC5013
+00031C 050000EF	    jal   ra,xmitPacket
+                        	.su3:
+000320 030069BF	    ldi   a1,#BMP_PCMD
+000324 FFDC5013
+000328 00206A13	    ldi   a2,#2            ; plot pixel command
+00032C 040000EF	    jal   ra,xmitPacket
+000330 001D8D93			addi  t1,t1,#1
+000334 0C006D13			ldi   t0,#192
+000338 FDADE6E3	  	bltu  t1,t0,.su4
+00033C FA1FF06F	    jal   x0,.su5
+                        	
+                        	//---------------------------------------------------------------------------
+                        	// Randomize bitmap display
+                        	//---------------------------------------------------------------------------
+                        	bmp_rand:
+                        	.su6:
+000340 088000EF	    jal   ra,gen_rand
+000344 01086A33	    or    a2,v0,v0         ; a2 = color
+000348 080000EF	    jal   ra,gen_rand
+00034C FFC879BF	    andi  a1,v0,#$0FFFFC   ; a1 = random address
+000350 000FF013
+000354 0009E9BF	    ori   a1,a1,#$400000
+000358 00400013
+00035C 01F0693F	    ldi   a0,#$1000001F    ; target system interface for word write cycle
+000360 10000013
+000364 008000EF	    jal   ra,xmitPacket
+000368 FC000CE3	    beq   x0,x0,.su6
+                        	
+                        	//---------------------------------------------------------------------------
+                        	//---------------------------------------------------------------------------
+                        	
+                        	xmitPacket:
+00036C FFC70713	  addi  sp,sp,#-4
+000370 01A72023	  sw    t0,[sp]
+                        	  ; first wait until the transmitter isn't busy
+                        	.0001:
+000374 00002D3F	  lw    t0,NOCC_STAT
+000378 FFD80003
+00037C 100D7D13	  andi  t0,t0,#$100      ; bit 8 is xmit status
+000380 FE0D1AE3	  bne   t0,x0,.0001
+                        	  ; Now transmit packet
+000384 0120243F	  sw    a0,NOCC_PKTHI    ; set high order packet word
+000388 FFD80023
+00038C 0130223F	  sw    a1,NOCC_PKTMID   ; set middle packet word
+000390 FFD80023
+000394 0140203F	  sw    a2,NOCC_PKTLO    ; and set low order packet word
+000398 FFD80023
+00039C 00002C3F	  sw    x0,NOCC_TXPULSE  ; and send the packet
+0003A0 FFD80023
+0003A4 00072D03	  lw    t0,[sp]
+0003A8 00470713	  addi  sp,sp,#4
+0003AC 00008067	- jal   [ra]
+                        	
+                        	//---------------------------------------------------------------------------
+                        	// Generate a random number
+                        	// Uses George Marsaglia's multiply method
+                        	//
+                        	// m_w = <choose-initializer>;    /* must not be zero */
+                        	// m_z = <choose-initializer>;    /* must not be zero */
+                        	//
+                        	// uint get_random()
+                        	// {
+                        	//     m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+                        	//     m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+                        	//     return (m_z << 16) + m_w;  /* 32-bit result */
+                        	// }
+                        	//---------------------------------------------------------------------------
+                        	//
+                        	// Seed the generator with a number dependent on the core number so each
+                        	// core has a unique series of numbers.
+                        	//
+                        	srand:
+                        	;    lw    v0,CPU_INFO      ; figure out which core we are
+0003B0 F1001873		csrrw v0,#$F10,x0
+0003B4 0100223F	    sw    v0,m_z
+0003B8 00010023
+0003BC 0120203F	    sw    a0,m_w
+0003C0 00010023
+0003C4 00008067	-   jal   [ra]
+                        	    
+                        	gen_rand:
+0003C8 FFC70713			addi	sp,sp,#-4
+0003CC 01A72023			sw		t0,[sp]
+0003D0 0000283F			lw		v0,m_z
+0003D4 00010003
+0003D8 06906D3F			ldi   t0,#36969
+0003DC 00009013
+0003E0 03A80D33			mul 	t0,v0,t0
+0003E4 01085813			srli	v0,v0,#16
+0003E8 010D0D33			add  	t0,t0,v0
+0003EC 01A0223F			sw		t0,m_z
+0003F0 00010023
+                        	
+0003F4 0000283F			lw		v0,m_w
+0003F8 00010003
+0003FC 65006D3F			ldi   t0,#18000
+000400 00004013
+000404 03A80D33			mul 	t0,v0,t0
+000408 01085813			srli	v0,v0,#16
+00040C 010D0D33			add 	t0,t0,v0
+000410 01A0203F			sw		t0,m_w
+000414 00010023
+                        	
+000418 0000283F			lw		v0,m_z
+00041C 00010003
+000420 01081813			slli	v0,v0,#16
+000424 01A80833			add	  v0,v0,t0
+000428 00072D03			lw		t0,[sp]
+00042C 00470713			addi	sp,sp,#4
+000430 00008067	-		jal   [ra]
+                        	
+                        	rand:
+000434 FFC70713			addi	sp,sp,#-4
+000438 01A72023			sw		t0,[sp]
+00043C 0000283F			lw		v0,m_z
+000440 00010003
+000444 00002D3F			lw    t0,m_w
+000448 00010003
+00044C 01081813			slli	v0,v0,#16
+000450 01A80833			add	  v0,v0,t0
+000454 00072D03			lw		t0,[sp]
+000458 00470713			addi	sp,sp,#4
+00045C 00008067	-		jal   [ra]
+                        	
+                        	//---------------------------------------------------------------------------
+                        	//---------------------------------------------------------------------------
+                        	
+                        	init_gfx:
+000460 FFC70713	    addi  sp,sp,#-4
+000464 00172023	    sw    ra,[sp]
+000468 01F0693F	    ldi   a0,#$1000001F   ; select write cycle to main system
+00046C 10000013
+000470 000069BF	    ldi   a1,#GFX_CONTROL ; graphics control register address
+000474 FFD40013
+000478 00006A3F	    ldi   a2,#$300000     ; 16 bpp
+00047C 00300013
+000480 EEDFF0EF	    jal   ra,xmitPacket
+000484 010069BF	    ldi   a1,#GFX_TGT_BASE  ; set graphics base address to 0
+000488 FFD40013
+00048C 00006A13	    ldi   a2,#0
+000490 EDDFF0EF	    jal   ra,xmitPacket
+                        	; set size of graphics screen
+000494 014069BF	    ldi   a1,#GFX_TGT_SIZEX
+000498 FFD40013
+00049C 55006A13	    ldi   a2,#1360         ; screen is 1360 x 768
+0004A0 ECDFF0EF	    jal   ra,xmitPacket
+0004A4 018069BF	    ldi   a1,#GFX_TGT_SIZEY
+0004A8 FFD40013
+0004AC 30006A13	    ldi   a2,#768
+0004B0 EBDFF0EF	    jal   ra,xmitPacket
+                        	; set the clip to the whole screen
+0004B4 074069BF	    ldi   a1,#GFX_CLIP_P0_X
+0004B8 FFD40013
+0004BC 00006A13	    ldi   a2,#0
+0004C0 EADFF0EF	    jal   ra,xmitPacket
+0004C4 078069BF	    ldi   a1,#GFX_CLIP_P0_Y
+0004C8 FFD40013
+0004CC EA1FF0EF	    jal   ra,xmitPacket
+0004D0 00006A3F	    ldi   a2,#1360<<16
+0004D4 05500013
+0004D8 07C069BF	    ldi   a1,#GFX_CLIP_P1_X
+0004DC FFD40013
+0004E0 E8DFF0EF	    jal   ra,xmitPacket
+0004E4 00006A3F	    ldi   a2,#768<<16
+0004E8 03000013
+0004EC 080069BF	    ldi   a1,#GFX_CLIP_P1_Y
+0004F0 FFD40013
+0004F4 E79FF0EF	    jal   ra,xmitPacket
+                        	; Fill screen with blue
+0004F8 80006D3F	    ldi   t0,#1360*768/2  ; 2 pixels per word
+0004FC 0007F013
+000500 01F0693F	    ldi   a0,#$1000001F   ; select write cycle to main system
+000504 10000013
+000508 00006D93	    ldi   t1,#0
+                        	.0001:
+00050C 000DE9B3	    or    a1,t1,x0        ; screen base address
+000510 01F06A3F	    ldi   a2,#%00000_000000_11111_00000_000000_11111
+000514 001F0013
+000518 E55FF0EF	    jal   ra,xmitPacket
+00051C 080069BF	    ldi   a1,#SSG
+000520 FFDC0013
+000524 000DEA33	    or    a2,t1,x0
+000528 E45FF0EF	    jal   ra,xmitPacket
+00052C 004D8D93	    addi  t1,t1,#4
+000530 FFFD0D13	    addi  t0,t0,#-1
+000534 FC0D1CE3	    bne   t0,x0,.0001
+                        	
+000538 00072083	    lw    ra,[sp]
+00053C 00470713	    addi  sp,sp,#4
+000540 00008067	-   jal   [ra]
+                        	
+                        	sprite_demo:
+                        	    ; First fill sprite with random image data or nothing will show
+                        	;    lw    t0,CPU_INFO
+000544 F1001D73	    csrrw t0,#$F10,x0
+000548 0F0D7D13	    andi  t0,t0,#$F0      ; t0 = index into register set
+00054C 004D1D93	    slli  t1,t0,#4        ; align to 4k boundary
+000550 40006E13	    ldi   t2,#1024        ; 1024 words to update
+000554 01F0693F	    ldi   a0,#$1000001F   ; select write cycle to main system
+000558 10000013
+00055C 000D89BF	    addi  a1,t1,#SPRITE_IMAGE ; set sprite image data address
+000560 FFD80013
+                        	.0001:
+000564 E65FF0EF	    jal   ra,gen_rand     ; get a random number
+000568 00086A33	    or    a2,v0,x0        ; move to a2
+00056C E01FF0EF	    jal   ra,xmitPacket
+000570 00498993	    addi  a1,a1,#4        ; advance to next word
+000574 FFFE0E13	    addi  t2,t2,#-1       ; decrement word count
+000578 FE0E16E3	    bne   t2,x0,.0001
+                        	; set random sprite position
+00057C E4DFF0EF	    jal   ra,gen_rand
+000580 7FF87A3F	    andi  a2,v0,#$03FF07FF
+000584 03FF0013
+                        	; set a random dx,dy for the sprite
+000588 E41FF0EF	    jal   ra,gen_rand
+00058C 00787E3F	    andi  t2,v0,#$00070007; t2 = random delta
+000590 00070013
+                        	.0002:
+000594 01CA0A33	    add   a2,a2,t2  
+000598 7FFA7A3F	    andi  a2,a2,#$03FF07FF; limit roughly to screen co-ords
+00059C 03FF0013
+0005A0 000D09BF	    addi  a1,t0,#SPRITE_POS
+0005A4 FFDAD013
+0005A8 DC5FF0EF	    jal   ra,xmitPacket   ; update sprite position
+0005AC FE0004E3	    beq   x0,x0,.0002    
+                        	   
+                        	nmi_rout:
+0005B0 10000073		eret
+                        	
+                        	end_of_program:
+                        	
+                        	
+                        	
+                        	
+                        		rodata
+                        		align 8                        	
+                        	begin_init_data:
+                        	
+                        		rodata
+                        		align 8                        	
+                        	end_init_data:
+53 symbols
+  Symbol Name                              seg     address bits
+Ì BMP_COLOR                                 const  ffdc502c 33
+Ì BMP_PCMD                                  const  ffdc5030 33
+Ì BMP_PX                                    const  ffdc5024 33
+Ì BMP_PY                                    const  ffdc5028 33
+Ì CPU_INFO                                  const  ffd90000 33
+Ì GFX_CLIP_P0_X                             const  ffd40074 33
+Ì GFX_CLIP_P0_Y                             const  ffd40078 33
+Ì GFX_CLIP_P1_X                             const  ffd4007c 33
+Ì GFX_CLIP_P1_Y                             const  ffd40080 33
+Ì GFX_CONTROL                               const  ffd40000 33
+Ì GFX_TGT_BASE                              const  ffd40010 33
+Ì GFX_TGT_SIZEX                             const  ffd40014 33
+Ì GFX_TGT_SIZEY                             const  ffd40018 33
+Ì NOCC_PKTHI                                const  ffd80008 33
+Ì NOCC_PKTLO                                const  ffd80000 33
+Ì NOCC_PKTMID                               const  ffd80004 33
+Ì NOCC_STAT                                 const  ffd8001c 33
+Ì NOCC_TXPULSE                              const  ffd80018 33
+Ì NormAttr                                  const  000008 5
+Ì SPRITE_CTRL                               const  ffdad000 33
+Ì SPRITE_IMAGE                              const  ffd80000 33
+Ì SPRITE_POS                                const  ffdad000 33
+Ì SSG                                       const  ffdc0080 33
+Ì TEXTSCR                                   const  ffd00000 33
+Ì TXTCOLS                                   const  000004 4
+Ì TXTROWS                                   const  000001 2
+  begin_init_data                          rodata  001000 32
+  bmp_line                                   code  0002dc 32
+  bmp_line.su3                               code  000320 32
+  bmp_line.su4                               code  000304 32
+  bmp_line.su5                               code  0002dc 32
+  bmp_rand                                   code  000340 32
+  bmp_rand.su6                               code  000340 32
+  end_init_data                            rodata  001000 32
+  end_of_program                             code  0005b4 32
+  gen_rand                                   code  0003c8 32
+  init_gfx                                   code  000460 32
+  init_gfx.0001                              code  00050c 32
+  m_w                                         bss  010000 32
+  m_z                                         bss  010004 32
+* nmi_rout                                   code  0005b0 32
+  rand                                       code  000434 32
+  sprite_demo                                code  000544 32
+  sprite_demo.0001                           code  000564 32
+  sprite_demo.0002                           code  000594 32
+  srand                                      code  0003b0 32
+  start                                      code  000204 32
+  start.0001                                 code  000290 32
+  start.0002                                 code  0002d8 32
+  start.0003                                 code  00029c 32
+  start.0004                                 code  00028c 32
+  xmitPacket                                 code  00036c 32
+  xmitPacket.0001                            code  000374 32
+0 compressable instructions
+The top 1024 are:
+Comp  Opcode  Count
+
+number of bytes: 0
+number of instructions: 0
+-1.#IND00 bytes (-2147483648 bits) per instruction

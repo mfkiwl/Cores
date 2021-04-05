@@ -1,0 +1,329 @@
+; ============================================================================
+;        __
+;   \\__/ o\    (C) 2020  Robert Finch, Stratford
+;    \  __ /    All rights reserved.
+;     \/_//     robfinch<remove>@finitron.ca
+;       ||
+;  
+;
+; This source file is free software: you can redistribute it and/or modify 
+; it under the terms of the GNU Lesser General Public License as published 
+; by the Free Software Foundation, either version 3 of the License, or     
+; (at your option) any later version.                                      
+;                                                                          
+; This source file is distributed in the hope that it will be useful,      
+; but WITHOUT ANY WARRANTY; without even the implied warranty of           
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the            
+; GNU General Public License for more details.                             
+;                                                                          
+; You should have received a copy of the GNU General Public License        
+; along with this program.  If not, see <http://www.gnu.org/licenses/>.    
+;
+; ============================================================================
+
+TC64CursorAddr	equ		$FFD1DF1C
+
+;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+; Device command 
+;
+	align	8
+VideoFuncTbl:
+	dco		0							; no operation
+	dco		0							; setup
+	dco		0							; initialize
+	dco		0							; status
+	dco		0							; media check
+	dco		0							; build BPB
+	dco		0							; open
+	dco		0							; close
+	dco		0							; get char
+	dco		0							; Peek char
+	dco		0							; get char direct
+	dco		0							; peek char direct
+	dco		0							; input status
+	dco		VideoPutChar	; Put char
+	dco		0							; reserved
+	dco		0							; set position
+	dco		0							; read block
+	dco		0							; write block
+	dco		0							; verify block
+	dco		0							; output status
+	dco		0							; flush input
+	dco		0							; flush output
+	dco		VideoIRQ			; IRQ routine
+	dco		0							; Is removable
+	dco		0							; ioctrl read
+	dco		0							; ioctrl write
+	dco		0							; output until busy
+	dco		0							; 27
+	dco		0
+	dco		0
+	dco		0
+	dco		0							; 31
+
+;------------------------------------------------------------------------------
+; VideoInit
+;
+; Initialize the versatile interface adapter.
+;------------------------------------------------------------------------------
+
+VideoInit:
+	sub		$sp,$sp,#8
+	sto		$ra,[$sp]
+	ldi		$a0,#2							; Video device
+	ldi		$a1,#VideoFuncTbl
+	pfi
+	call	CopyDevFuncTbl
+	stb		$x0,CursorX
+	stb		$x0,CursorY
+	ldi		$t0,#$000F0000
+	stt		$t0,DispAttr
+	ldi		$t0,#$0020FFFF
+	stt		$t0,DispAttr+4
+	pfi
+	call	VideoClearScreen
+	ldo		$ra,[$sp]
+	add		$sp,$sp,#8
+	ret
+
+VideoClearScreen:
+;	csrrs	$x0,#$300,#1				; interrupts on
+	ldi		$t0,#56*29
+	ldo		$t1,DispAttr
+	or		$t1,$t1,#' '
+	mGetVideoPtr
+.0001:
+	pfi
+	sto		$t1,[$v0]	
+	add		$v0,$v0,#8
+	sub		$t0,$t0,#1
+	bgt		$t0,$x0,.0001
+	ret
+
+;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+
+VideoHomeCursor:
+	stb		$x0,CursorX
+	stb		$x0,CursorY
+	; fall through into update cursor pos.
+
+;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+
+UpdateCursorPos:
+	ldbu	$t0,CursorY
+	ldi		$t1,#56
+	pfi
+	mul		$t0,$t0,$t1
+	ldbu	$t1,CursorX
+	add		$t0,$t0,$t1
+	stw		$t0,TC64CursorAddr
+	ret
+
+;------------------------------------------------------------------------------
+; Parameters:
+;		a3 = character to display
+;------------------------------------------------------------------------------
+
+VideoPutChar:
+	sub		$sp,$sp,#16
+	sto		$ra,[$sp]
+	sto		$s1,8[$sp]
+	ldi		$t0,#CR
+	pfi
+	beq		$a3,$t0,.doCR
+	ldi		$t0,#$0A				; line feed
+	beq		$a3,$t0,.doLF
+	ldi		$t0,#$0C				; CTRL-L
+	beq		$a3,$t0,.doCls
+	ldi		$t0,#$91
+	pfi
+	beq		$a3,$t0,.cursorRight
+	ldi		$t0,#$93
+	beq		$a3,$t0,.cursorLeft
+	ldi		$t0,#$90
+	beq		$a3,$t0,.cursorUp
+	ldi		$t0,#$92
+	pfi
+	beq		$a3,$t0,.cursorDown
+	ldi		$t0,#BS
+	beq		$a3,$t0,.backspace
+	ldi		$t0,#$99
+	beq		$a3,$t0,.delete
+	pfi
+	mGetVideoPtr
+	mov		$t0,$v0
+	ldbu	$t1,CursorX
+	sll		$t1,$t1,#3						; *8 bytes per display cell
+	or		$t0,$t0,$t1						; add in base address
+	ldbu	$t1,CursorY
+	pfi
+	ldi		$t2,#56*8
+	mul		$t1,$t1,$t2
+	add		$t0,$t0,$t1
+	ldo		$t1,DispAttr
+	pfi
+	or		$t1,$t1,$a3
+	sto		$t1,[$t0]							; store to screen memory
+	ldbu	$t0,CursorX						; increment cursor position
+	add		$t0,$t0,#1
+	ldi		$t1,#56
+	pfi
+	blt		$t0,$t1,.saveX
+	ldi		$t0,#0
+.doLF1:
+	pfi
+	ldbu	$t2,CursorY
+	add		$t2,$t2,#1
+	ldi		$t1,#29
+	blt		$t2,$t1,.saveY
+	; scroll up
+	ldi		$t3,#56*28
+	mGetVideoPtr
+;	ldi		$t4,#$FFD00000
+	mov		$t4,$v0
+.0001:
+	pfi
+	ldo		$t5,56*8[$t4]
+	sto		$t5,[$t4]
+	add		$t4,$t4,#8
+	sub		$t3,$t3,#1
+	bgt		$t3,$x0,.0001
+	; blank last line
+	ldo		$t5,DispAttr
+	or		$t5,$t5,#' '
+	ldi		$t3,#56
+.bll1:
+	pfi
+	sto		$t5,[$t4]
+	add		$t4,$t4,#8
+	sub		$t3,$t3,#1
+	bgt		$t3,$x0,.bll1
+.xit:
+	pfi
+	ldo		$ra,[$sp]
+	ldo		$s1,8[$sp]
+	add		$sp,$sp,#16
+	ret
+.saveY:
+	stb		$t2,CursorY
+.saveX:
+	pfi
+	stb		$t0,CursorX
+	call	UpdateCursorPos
+	bra		.xit
+.doCR:
+	stb		$x0,CursorX
+	pfi
+	call	UpdateCursorPos
+	bra		.xit
+.doLF:
+	ldbu	$t0,CursorX
+	bra		.doLF1
+.cursorRight:
+	pfi
+	ldbu	$t0,CursorX
+	add		$t0,$t0,#1
+	ldi		$t1,#55
+	bge		$t0,$t1,.cr1
+	stb		$t0,CursorX
+.cr2:
+	pfi
+	call	UpdateCursorPos
+.cr1:
+	bra		.xit
+.cursorLeft:
+	ldbu	$t0,CursorX
+	sub		$t0,$t0,#1
+	blt		$t0,$x0,.cr1
+	stb		$t0,CursorX
+	bra		.cr2
+.cursorUp:
+	ldbu	$t0,CursorY
+	sub		$t0,$t0,#1
+	blt		$t0,$x0,.cr1
+	stb		$t0,CursorY
+	bra		.cr2
+.cursorDown:
+	ldbu	$t0,CursorY
+	add		$t0,$t0,#1
+	ldi		$t1,#29
+	bge		$t0,$t1,.cr1
+	stb		$t0,CursorY
+	bra		.cr2
+.doCls:
+	pfi
+	call	VideoClearScreen
+	call	VideoHomeCursor
+	pfi
+	bra		.cr1
+.backspace:
+	ldbu	$t0,CursorX
+	beqz	$t0,.cr1
+	sub		$t0,$t0,#1
+	stb		$t0,CursorX
+.del0001:
+	pfi
+	ldi		$s1,#55
+	sub		$s1,$s1,$t0
+	call	UpdateCursorPos
+	pfi
+	ldbu	$t1,CursorY
+	ldi		$t3,#56*8
+	mul		$t1,$t1,$t3
+	sll		$t0,$t0,#3
+	add		$t3,$t1,$t0
+	add		$t3,$t3,#$FFD00000
+	beqz	$s1,.bs0001
+.bs0002:
+	pfi
+	ldo		$t4,8[$t3]
+	sto		$t4,[$t3]
+	add		$t3,$t3,#8
+	sub		$s1,$s1,#1
+	bgt		$s1,.bs0002
+.bs0001:
+	pfi
+	ldo		$t4,DispAttr
+	or		$t4,$t4,#' '
+	sto		$t4,8[$t3]
+	bra		.xit
+.delete:
+	ldbu	$t0,CursorX
+	pfi
+	bra		.del0001	
+
+;------------------------------------------------------------------------------
+; Parameters:
+;		a1  = pointer to null terminated string
+;------------------------------------------------------------------------------
+
+VideoPutString:
+	sub		$sp,$sp,#8
+	sto		$ra,[$sp]
+.again:
+	pfi
+	ldi		$t0,#$10000
+	csrrs	$x0,#$300,$t0		; set mprv
+	ldbu	$a3,[$a1]				; access using passed in memory space
+	csrrc	$x0,#$300,$t0		; clear mprv
+	add		$a1,$a1,#1
+	beqz	$a3,.done
+	pfi
+	call	VideoPutChar
+	bra		.again
+.done:
+	pfi
+	ldo		$ra,[$sp]
+	add		$sp,$sp,#8
+	ret
+
+;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+
+VideoIRQ:
+	; Was it the Video that caused the interrupt?
+.0003:
+	eret

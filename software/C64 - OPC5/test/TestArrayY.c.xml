@@ -1,0 +1,201 @@
+<title>C64D Compiler debug file</title>
+<compile>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+<TYP__Make>
+</TYP__Make>
+</Find>
+_int</Find>
+<Parsing GlobalDecl>
+<ParseGlobalDecl>
+Enter declare()
+A<ParseSpecifier>
+A</Find>
+_TestArrayY</Find>
+<TYP__Make>
+</TYP__Make>
+</ParseSpecifier>
+Bb<ParseDeclPrefix>(1)
+<ParsePrefixId>B|_TestArrayY|CDE<ParseDeclSuffix>
+<openpa>
+****************************
+****************************
+Function: _TestArrayY
+****************************
+****************************
+</Find>
+_int</Find>
+<TYP__Make>
+</TYP__Make>
+o p q rsYParameter types(_TestArrayY)
+Type array:
+   
+Proto types(_TestArrayY)
+Type array:
+   
+X</openpa>
+</ParseDeclSuffix>
+</ParsePrefixId></ParseDeclPrefix>
+CDEGH</Find>
+_TestArrayY</Find>
+hh1h2ikIIbIcinsert type: 33
+***Inserting:_TestArrayY into 008B8F48
+<BuildSignature>:_TestArrayY</BuildSignature>Insert _TestArrayY into 008B8F48()
+Insert into global table
+</Find>
+_TestArrayY</Find>
+At insert:
+Type array:
+   
+J<ParseFunction>
+***********************************
+***********************************
+***********************************
+Parsing function: _TestArrayY
+***********************************
+***********************************
+***********************************
+A<BuildParameterList
+><ParseParmDecls>
+A(54)CEnter declare()
+A<ParseSpecifier>
+A</Find>
+_a</Find>
+<TYP__Make>
+</TYP__Make>
+</ParseSpecifier>
+Bb<ParseDeclPrefix>(1)
+<ParsePrefixId>B|_a|CDE<ParseDeclSuffix>
+</ParseDeclSuffix>
+</ParsePrefixId></ParseDeclPrefix>
+CDEGH</Find>
+_a</Find>
+hh1kIIbIcinsert type: 16
+***Inserting:_a into 008C642C
+<BuildSignature>:_a</BuildSignature>Insert _a into 008C642C(_TestArrayY)
+</Find>
+_a</Find>
+At insert:
+Type array:
+   
+JKEA(45)</ParseParmDecls>
+B</Find>
+_aMatch
+</Find>
+</BuildParameterList>
+B<BuildSignature>:_TestArrayY</BuildSignature></Find>
+_TestArrayYMatch
+</Find>
+CDEG<Parse function body>:_TestArrayY|
+</Find>
+_int</Find>
+Bb<GenerateMonadic>
+ABCD</GenerateMonadic>
+CEnter declare()
+A<ParseSpecifier>
+A</Find>
+_y</Find>
+<TYP__Make>
+</TYP__Make>
+</ParseSpecifier>
+Bb<ParseDeclPrefix>(1)
+<ParsePrefixId>B|_y|CDE<ParseDeclSuffix>
+<TYP__Make>
+</TYP__Make>
+Setting array size:8
+</ParseDeclSuffix>
+</ParsePrefixId></ParseDeclPrefix>
+CDEGH</Find>
+_y</Find>
+hh1kIIbIcinsert type: 22
+***Inserting:_y into 011ECE80
+<BuildSignature>:_y</BuildSignature>Insert _y into 011ECE80()
+</Find>
+_y</Find>
+At insert:
+Type array:
+   
+JK</Find>
+_y</Find>
+Found _y
+</Find>
+_y</Find>
+</Find>
+_y</Find>
+<Parse><ParseExpression>
+<Nameref>
+GSearchfor:_y|
+<gsearch2> for: |_y|
+Looking in statement table
+</Find>
+_yMatch
+</Find>
+Found as an auto var
+</gsearch2>
+<nameref2>
+A:1:_yIsEqual:T2sp is not null
+Type array:
+   
+tp:00E3B838 <TYP__Make>
+</TYP__Make>
+deref tp:00E3B870 </nameref2>
+</Nameref>
+<TYP__Make>
+</TYP__Make>
+</ParseExpression>
+</Parse>Returning EOF from NextToken.
+D<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+<GenerateMonadic>
+ABCD</GenerateMonadic>
+E</ParseFunctionBody>
+Enter funcbottom
+Leave funcbottom
+F</ParseFunction>
+</ParseGlobalDecl>
+</Parsing GlobalDecl>
+</compile>
+<Dumplits>
+</Dumplits>
+Enter summary
+Leave summary
+<closefiles>
+ABC</closefiles>
+Next on command line (1).
+Exiting
