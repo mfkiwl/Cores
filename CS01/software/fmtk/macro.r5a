@@ -1,6 +1,6 @@
 ; ============================================================================
 ;        __
-;   \\__/ o\    (C) 2020  Robert Finch, Stratford
+;   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
 ;    \  __ /    All rights reserved.
 ;     \/_//     robfinch<remove>@finitron.ca
 ;       ||
@@ -102,6 +102,15 @@ macro mMbxHandleToPointer
   or    $a0,$a0,$t0
 endm
 
+macro mMbxHandleToPointer2(handle,temp)
+  srl   temp,handle,#8    ; extract collection index
+  sll   temp,temp,#2
+  ldt   temp,MbxBlockPtr[temp]
+  and   handle,handle,#$FF
+  sll   handle,handle,#2
+  or    handle,handle,temp
+endm
+
 ;------------------------------------------------------------------------------
 ; Pop an entry off the timeout list. It is assumed the entry is popped when
 ; its timeout reached zero. Hence there is no adjustment of the following
@@ -134,7 +143,9 @@ endm
 endm
 
 macro mGetAppMid
-  sll   $a0,$a0,#LOG_PGSZ
+  sll   $a0,$a0,#2
+  ldt		$a0,ACBPtrs[$a0]
+  and		$a0,$a0,#$FFC00
   ldb   $a0,ACBmid[$a0]
 endm
 
@@ -144,23 +155,15 @@ macro mTimeSliceEI
 	stt		$t0,VIA_IER+VIA
 endm
 
+macro mTimeSliceEI2(tm)
+	ldi		$t0,#$000180|(tm<<24)		; enable timer3 interrupts after tm cycles
+	stt		$t0,VIA_IER+VIA
+endm
+
 macro mTimeSliceDI
 	ldi		$t0,#$100						; disable timer3 (time slice) interrupts
 	stt		$t0,VIA_IER+VIA
 	nop                   ; make sure disable has time for effect
 	nop
-endm
-
-; Inserting into the ready queue is done by both OS ecall functions and
-; interrupt driven scheduling. It's important to have interrupts disabled
-; so that there is no contention for the ready queue.
-
-macro mInsertIntoReadyQueue
-	sll   $t0,$a0,#LOG_TCBSZ
-	ldbu	$t1,TCBStatus[$t0]	; set status to ready
-	or		$t1,$t1,#TS_READY
-	stb		$t1,TCBStatus[$t0]
-	ldb		$t1,TCBPriority[$t0]
-	pushq	$a0,$t1
 endm
 

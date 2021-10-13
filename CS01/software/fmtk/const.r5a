@@ -1,6 +1,6 @@
 ; ============================================================================
 ;        __
-;   \\__/ o\    (C) 2020  Robert Finch, Stratford
+;   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
 ;    \  __ /    All rights reserved.
 ;     \/_//     robfinch<remove>@finitron.ca
 ;       ||
@@ -50,6 +50,11 @@ ACB_MAGIC     EQU   ((' ' << 24) | ('A' << 16) | ('C' << 8) | 'B')
 MSG_MAGIC     EQU   ((' ' << 24) | ('M' << 16) | ('S' << 8) | 'G')
 MBX_MAGIC     EQU   ((' ' << 24) | ('M' << 16) | ('B' << 8) | 'X')
 
+OT_TCB		EQU		0
+OT_ACB		EQU		1
+OT_MSG		EQU		2
+OT_MBX		EQU		3
+
 UNDEADQ     EQU   7
 
 ; error codes
@@ -69,6 +74,7 @@ E_BadDevNum	=		0x18
 E_DCBInUse	=		0x19
 E_BadDCBOffset = 0x1A
 E_Busy = 0x1B
+E_BadAppId = 0x1C
 ; Device driver errors
 E_BadDevNum	=		0x20
 E_NoDev		=		0x21
@@ -84,17 +90,20 @@ E_BadTid = 0x28
 E_NoMoreMbx	=		0x40
 E_NoMoreMsgBlks	=	0x41
 E_NoMoreAlarmBlks	= 0x44
-E_NoMoreTCBs	=	0x45
+E_NoMoreTcbs	=	0x45
 E_NoMoreAppIds = 0x46
 E_NoMem = 0x47
 
+CSR_SATP		= $180
 CSR_MSTATUS = $300
 CSR_MEPC    = $341
+CSR_TRACECTRL = $7A0
 CSR_REGSET  = $7C0
 CSR_MSEMA   = $7C1
 CSR_TASKID  = $7C2
 CSR_RSSTACK = $7C3
 CSR_PMSTACK = $7C4
+CSR_IMSTACK = $7C5
 TCBPTR_MASK = $FFF803FF
 
 ; Message types

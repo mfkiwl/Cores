@@ -1,23 +1,36 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2020  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2019-2021  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
 //
-// This source file is free software: you can redistribute it and/or modify 
-// it under the terms of the GNU Lesser General Public License as published 
-// by the Free Software Foundation, either version 3 of the License, or     
-// (at your option) any later version.                                      
-//                                                                          
-// This source file is distributed in the hope that it will be useful,      
-// but WITHOUT ANY WARRANTY; without even the implied warranty of           
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the            
-// GNU General Public License for more details.                             
-//                                                                          
-// You should have received a copy of the GNU General Public License        
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.    
+// BSD 3-Clause License
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this
+//    list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                                                                          
 // ============================================================================
 //
@@ -58,8 +71,8 @@ assign pio3 = 23'bz;
 // -----------------------------------------------------------------------------
 wire xrst;					// external reset (push button)
 wire rst;						// internal reset
-wire clk100;
-wire clk50;
+wire clk80;
+wire clk40;
 wire clk;						// system clock (50MHz)
 wire clk14p7;				// uart clock 14.746 MHz
 wire clk20;					// 20MHz for wall clock time
@@ -86,7 +99,7 @@ wire cs_sema;
 wire ack_rom;
 wire ack_mem;
 wire uart_irq, via_irq;
-wire ack_uart, ack_via;
+wire ack_uart, ack_via, ack_sema;
 wire [31:0] uart_dato;
 wire [31:0] via_dato;
 wire [31:0] mem_dato;
@@ -102,8 +115,8 @@ wire [31:0] pa_o;
 cs01clkgen ucg1
 (
   // Clock out ports
-  .clk100(clk100),
-  .clk50(clk50),
+  .clk80(clk80),
+  .clk40(clk40),
   .clk14p7(clk14p7),
   .clk20(clk20),
   // Status and control signals
@@ -115,8 +128,8 @@ cs01clkgen ucg1
 
 assign rst = !locked;
 assign irq = uart_irq|via_irq;
-assign clk = clk50;
-assign cpuclk = clk50;
+assign clk = clk40;
+assign cpuclk = clk40;
 
 // -----------------------------------------------------------------------------
 // Circuit select logic
@@ -155,7 +168,7 @@ assign cs_rom = cyc && stb && adr[31:16]==16'b1111_1111_1111_1100;	// $FFFCxxxx 
 assign cs_mem = cyc && stb && adr[31:16] < 16'h0008;
 assign cs_via = cyc && stb && adr[31:8]==24'hFFDC06;
 assign cs_uart = cyc && stb && adr[31:4]==28'hFFDC0A0;
-assign cs_sema = cyc && stb && adr[31:12]==20'hFFDB0;
+assign cs_sema = cyc && stb && adr[31:16]==16'hFFDB;
 
 (* ram_style="block" *)
 reg [31:0] rommem [0:6143];
@@ -227,7 +240,7 @@ assign led0_b = ~(pa_o[2] & dvd[12]);	// PWM 50% at about 12kHz.
 cs01memInterface umi1
 (
 	.rst_i(rst),
-	.clk_i(clk100),
+	.clk_i(clk80),
 	.cs_i(cs_mem),
 	.cyc_i(cyc),
 	.stb_i(stb),
@@ -246,24 +259,27 @@ cs01memInterface umi1
 
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
-/*
+
 semamem usema1
 (
-	.clk(cpuclk),
-	.cs(cs_sema),
-	.wr(we),
-	.ad(adr[9:0]),
-	.i(dat_o[7:0]),
-	.o(sema_dato)
+	.clk_i(cpuclk),
+	.cs_i(cs_sema),
+	.cyc_i(cyc),
+	.stb_i(stb),
+	.ack_o(ack_sema),
+	.we_i(we),
+	.adr_i(adr[14:2]),
+	.dat_i(dat_o[7:0]),
+	.dat_o(sema_dato)
 );
-*/
+
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 
 via6522 uvia1
 (
 	.rst_i(rst),
-	.clk_i(cpuclk),
+	.clk_i(clk40),
 	.irq_o(via_irq),
 	.cs_i(cs_via),
 	.cyc_i(cyc),
@@ -291,7 +307,7 @@ via6522 uvia1
 uart6551 uuart1
 (
 	.rst_i(rst),
-	.clk_i(cpuclk),
+	.clk_i(clk40),
 	.cs_i(cs_uart),
 	.irq_o(uart_irq),
 	.cyc_i(cyc),
@@ -313,7 +329,7 @@ uart6551 uuart1
 	.data_present(),
 	.rxDRQ_o(),
 	.txDRQ_o(),
-	.xclk_i(clk14p7),
+	.xclk_i(clk20),
 	.RxC_i(1'b0)
 );
 
@@ -322,7 +338,7 @@ uart6551 uuart1
 // -----------------------------------------------------------------------------
 
 always @(posedge cpuclk)
-	ack <= ack_rom|ack_mem|ack_via|ack_uart|cs_sema;
+	ack <= ack_rom|ack_mem|ack_via|ack_uart|ack_sema;
 
 always @(posedge cpuclk)
 casez({cs_rom,cs_mem,cs_via,cs_uart,cs_sema})
@@ -339,7 +355,7 @@ friscv_wb ucpu1
 	.rst_i(rst),
 	.clk_i(cpuclk),
 	.wc_clk_i(clk20),
-	.irq_i(uart_irq|via_irq),
+	.irq_i({1'b0,uart_irq,via_irq}),
 	.cause_i(uart_irq ? 8'd37 : via_irq ? 8'd47 : 8'd00),
 	.cyc_o(cyc),
 	.stb_o(stb),
@@ -361,7 +377,7 @@ CS01_ILA uila1 (
 	.probe3(ucpu1.we_o), // input wire [0:0]  probe3 
 	.probe4(ucpu1.adr_o), // input wire [31:0]  probe4 
 	.probe5(ucpu1.dat_o), // input wire [31:0]  probe5
-	.probe6({ucpu1.illegal_insn,ucpu1.irq_i,ucpu1.rsStack[7:0],ucpu1.mtid})
+	.probe6({ucpu1.irq_i,ucpu1.pmStack[8:0],ucpu1.mtid})
 //	.probe6({ucpu1.to_done,ucpu1.state,ucpu1.crs,ucpu1.regset})
 );
 
